@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-federated-auth-reader
+  namespace: aqsh-demo
+---
+# Cluster-wide: tokenreview so kube-federated-auth can validate tokens
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kube-federated-auth-reader
+rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kube-federated-auth-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-federated-auth-reader
+subjects:
+  - kind: ServiceAccount
+    name: kube-federated-auth-reader
+    namespace: aqsh-demo
+---
+# Namespaced: token creation so kube-federated-auth can renew its token
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kube-federated-auth-reader
+  namespace: aqsh-demo
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kube-federated-auth-reader
+  namespace: aqsh-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kube-federated-auth-reader
+subjects:
+  - kind: ServiceAccount
+    name: kube-federated-auth-reader
+    namespace: aqsh-demo

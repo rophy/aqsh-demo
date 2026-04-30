@@ -16,7 +16,7 @@ Always specify `--context` when running kubectl commands.
 
 - `ghcr.io/rophy/kube-federated-auth:3.2.0`
 - `ghcr.io/rophy/kube-auth-proxy:0.4.1`
-- `ghcr.io/rophy/aqsh:0.3.1`
+- `ghcr.io/null-ptr-exception/aqsh:0.4.0`
 
 ## Quick Start
 

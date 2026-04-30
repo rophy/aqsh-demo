@@ -16,7 +16,7 @@ spec:
       serviceAccountName: kube-auth-proxy
       containers:
         - name: aqsh
-          image: ghcr.io/rophy/aqsh:0.3.1
+          image: ghcr.io/null-ptr-exception/aqsh:0.4.0
           env:
             - name: AQSH_MODE
               value: both

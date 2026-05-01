@@ -87,4 +87,6 @@ spec:
             items:
               - key: hello.sh
                 path: hello.sh
+              - key: restart.sh
+                path: restart.sh
             defaultMode: 0755

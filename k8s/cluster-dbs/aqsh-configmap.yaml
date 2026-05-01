@@ -58,17 +58,18 @@ data:
     RESTART_AT=$(date -Iseconds)
     PATCH="{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"${RESTART_AT}\"}}}}}"
 
-    HTTP_CODE=$(wget -q -O /dev/stdout \
+    wget -q -O /dev/null \
       --header="Authorization: Bearer ${TOKEN}" \
       --header="Content-Type: application/strategic-merge-patch+json" \
       --method=PATCH \
       --body-data="${PATCH}" \
       --ca-certificate="${CACERT}" \
       "${APISERVER}/apis/apps/v1/namespaces/${DB_NAMESPACE}/statefulsets/${STS_NAME}" \
-      2>/dev/null | head -c 0; echo $?)
+      2>/dev/null
+    HTTP_CODE=$?
 
     if [ "$HTTP_CODE" != "0" ]; then
-      echo "ERROR: Failed to patch StatefulSet"
+      echo "ERROR: Failed to patch StatefulSet (wget exit code: ${HTTP_CODE})"
       exit 1
     fi
 

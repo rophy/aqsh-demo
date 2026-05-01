@@ -20,7 +20,8 @@ ISSUER_APPS=$(get_issuer cluster-apps)
 echo "cluster-dbs issuer:  $ISSUER_DBS"
 echo "cluster-apps issuer: $ISSUER_APPS"
 
-# Append issuers to .env
+# Update issuers in .env (remove old entries first for idempotency)
+sed -i '/^ISSUER_DBS=/d;/^ISSUER_APPS=/d' "$ENV_FILE"
 cat >> "$ENV_FILE" <<EOF
 ISSUER_DBS=${ISSUER_DBS}
 ISSUER_APPS=${ISSUER_APPS}

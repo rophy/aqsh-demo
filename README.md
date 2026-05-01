@@ -28,7 +28,7 @@ cluster-apps                 cluster-dbs                     cluster-auth
 | cluster-dbs | [kube-auth-proxy](https://github.com/rophy/kube-auth-proxy) | Sidecar that authenticates requests and sets identity headers for aqsh |
 | cluster-dbs | Redis | Message broker for aqsh task queue |
 | cluster-dbs | MariaDB (via mariadb-operator) | Database instance managed by the operator |
-| cluster-apps | test-client | Alpine pod with curl/jq that sends authenticated requests to aqsh |
+| cluster-apps | test-client | Pod (curlimages/curl) that sends authenticated requests to aqsh |
 
 ## Request Flow
 

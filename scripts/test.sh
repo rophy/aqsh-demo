@@ -138,6 +138,7 @@ echo "=== Test 6: In-pod test from cluster-apps (app-a) ==="
 
 echo "  \$ kubectl --context kind-cluster-apps -n app-a exec <test-client-pod> -- sh -c 'curl ... http://${CLUSTER_DBS_IP}:30081/tasks/hello'"
 
+kubectl --context kind-cluster-apps -n app-a wait --for=condition=Ready pod -l app=test-client --timeout=120s >/dev/null
 TEST_POD=$(kubectl --context kind-cluster-apps -n app-a get pod -l app=test-client -o jsonpath='{.items[0].metadata.name}')
 
 IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps -n app-a exec "$TEST_POD" -- \

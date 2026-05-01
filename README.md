@@ -43,7 +43,7 @@ cluster-apps                 cluster-dbs                     cluster-auth
 | Namespace | Clusters | Purpose |
 |-----------|----------|---------|
 | `db-ops` | cluster-auth, cluster-dbs, cluster-apps | Control plane — federated auth, aqsh task runner, cross-cluster credentials |
-| `db-1`, `db-2` | cluster-dbs | Per-application database instances |
+| `db-1`, `db-2`, `db-3` | cluster-dbs | MariaDB instances (10.6, 10.11, 11.4) |
 | `app-a`, `app-b` | cluster-apps | Per-application client workloads |
 
 Authorization is configured in aqsh task definitions: each app's ServiceAccount (`app-a/test-client`, `app-b/test-client`) is granted access to specific tasks via `allowed_users`, enforcing which app can operate on which database.
@@ -64,6 +64,7 @@ Pods in any cluster can reach services in other clusters at `<node-docker-ip>:<n
 - [Docker](https://docs.docker.com/get-docker/)
 - [kind](https://kind.sigs.k8s.io/)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Helm](https://helm.sh/)
 - [jq](https://jqlang.github.io/jq/)
 - curl
 
@@ -109,4 +110,6 @@ k8s/
 | ghcr.io/rophy/kube-federated-auth | 3.2.0 |
 | ghcr.io/rophy/kube-auth-proxy | 0.4.1 |
 | ghcr.io/null-ptr-exception/aqsh | 0.4.0 |
+| mariadb-operator (Helm) | latest |
+| mariadb | 10.6, 10.11, 11.4 |
 | redis | 7-alpine |

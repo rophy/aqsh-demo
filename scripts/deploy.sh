@@ -40,7 +40,32 @@ kubectl --context kind-cluster-auth apply -f "${ROOT_DIR}/k8s/cluster-auth/servi
 echo "Waiting for kube-federated-auth to be ready..."
 kubectl --context kind-cluster-auth -n db-ops rollout status deployment/kube-federated-auth --timeout=120s
 
-echo "=== Step 4: Deploy cluster-dbs (aqsh + kube-auth-proxy + Redis) ==="
+echo "=== Step 4: Deploy mariadb-operator ==="
+
+helm repo add mariadb-operator https://helm.mariadb.com/mariadb-operator 2>/dev/null || true
+helm repo update mariadb-operator
+
+helm upgrade --install mariadb-operator-crds mariadb-operator/mariadb-operator-crds \
+  --kube-context kind-cluster-dbs \
+  --wait
+
+helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+  --kube-context kind-cluster-dbs \
+  --namespace db-ops \
+  --wait
+
+echo "=== Step 5: Deploy MariaDB instances ==="
+
+kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mariadb-db-1.yaml"
+kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mariadb-db-2.yaml"
+kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mariadb-db-3.yaml"
+
+echo "Waiting for MariaDB instances to be ready..."
+kubectl --context kind-cluster-dbs -n db-1 wait --for=condition=Ready mariadb/mariadb --timeout=180s
+kubectl --context kind-cluster-dbs -n db-2 wait --for=condition=Ready mariadb/mariadb --timeout=180s
+kubectl --context kind-cluster-dbs -n db-3 wait --for=condition=Ready mariadb/mariadb --timeout=180s
+
+echo "=== Step 6: Deploy cluster-dbs (aqsh + kube-auth-proxy + Redis) ==="
 
 kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/redis.yaml"
 kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/aqsh-configmap.yaml"
@@ -56,7 +81,7 @@ kubectl --context kind-cluster-dbs -n db-ops rollout status deployment/redis --t
 echo "Waiting for aqsh to be ready..."
 kubectl --context kind-cluster-dbs -n db-ops rollout status deployment/aqsh --timeout=120s
 
-echo "=== Step 5: Deploy cluster-apps (test-client) ==="
+echo "=== Step 7: Deploy cluster-apps (test-client) ==="
 
 kubectl --context kind-cluster-apps apply -f "${ROOT_DIR}/k8s/cluster-apps/test-client.yaml"
 

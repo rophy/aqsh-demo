@@ -1,14 +1,14 @@
-# aqsh-demo
+# db-runbooks
 
-Multi-cluster sandbox demonstrating aqsh + kube-auth-proxy + kube-federated-auth across 3 Kind clusters.
+Multi-cluster sandbox for database operations automation with aqsh, kube-auth-proxy, kube-federated-auth, and mariadb-operator across 3 Kind clusters.
 
 ## kubectl Contexts
 
 | Context | Cluster | Purpose |
 |---------|---------|---------|
-| kind-cluster-a | cluster-a | kube-federated-auth server |
-| kind-cluster-b | cluster-b | aqsh + kube-auth-proxy + Redis |
-| kind-cluster-c | cluster-c | test-client workload |
+| kind-cluster-auth | cluster-auth | kube-federated-auth server |
+| kind-cluster-dbs | cluster-dbs | mariadb-operator + aqsh + kube-auth-proxy + Redis |
+| kind-cluster-apps | cluster-apps | test-client workload |
 
 Always specify `--context` when running kubectl commands.
 

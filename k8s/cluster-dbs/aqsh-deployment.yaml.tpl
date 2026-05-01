@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: aqsh
-  namespace: aqsh-demo
+  namespace: db-runbooks
 spec:
   replicas: 1
   selector:
@@ -57,7 +57,7 @@ spec:
             - name: UPSTREAM
               value: "http://localhost:8080"
             - name: TOKEN_REVIEW_URL
-              value: "http://${CLUSTER_A_IP}:30080"
+              value: "http://${CLUSTER_AUTH_IP}:30080"
             - name: PORT
               value: "4180"
           ports:

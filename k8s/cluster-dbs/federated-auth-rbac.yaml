@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: kube-federated-auth-reader
-  namespace: aqsh-demo
+  namespace: db-runbooks
 ---
 # Cluster-wide: tokenreview so kube-federated-auth can validate tokens
 apiVersion: rbac.authorization.k8s.io/v1
@@ -25,14 +25,14 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: kube-federated-auth-reader
-    namespace: aqsh-demo
+    namespace: db-runbooks
 ---
 # Namespaced: token creation so kube-federated-auth can renew its token
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: kube-federated-auth-reader
-  namespace: aqsh-demo
+  namespace: db-runbooks
 rules:
   - apiGroups: [""]
     resources: ["serviceaccounts/token"]
@@ -42,7 +42,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: kube-federated-auth-reader
-  namespace: aqsh-demo
+  namespace: db-runbooks
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -50,4 +50,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: kube-federated-auth-reader
-    namespace: aqsh-demo
+    namespace: db-runbooks

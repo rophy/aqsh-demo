@@ -1,40 +1,42 @@
-# aqsh-demo
+# db-runbooks
 
-A multi-cluster sandbox demonstrating cross-cluster workload authentication with [aqsh](https://github.com/rophy/aqsh), [kube-auth-proxy](https://github.com/rophy/kube-auth-proxy), and [kube-federated-auth](https://github.com/rophy/kube-federated-auth).
+A multi-cluster sandbox for database operations automation. Uses [aqsh](https://github.com/null-ptr-exception/aqsh) to execute runbook tasks against databases, with cross-cluster authentication via [kube-auth-proxy](https://github.com/rophy/kube-auth-proxy) and [kube-federated-auth](https://github.com/rophy/kube-federated-auth).
 
 ## Overview
 
-A test-client in **cluster-c** submits tasks to aqsh in **cluster-b**, authenticating with its own Kubernetes ServiceAccount token. The token is validated across clusters via kube-federated-auth in **cluster-a**.
+A test-client in **cluster-apps** submits tasks to aqsh in **cluster-dbs**, authenticating with its own Kubernetes ServiceAccount token. The token is validated across clusters via kube-federated-auth in **cluster-auth**.
 
 ```
-cluster-c                    cluster-b                       cluster-a
+cluster-apps                 cluster-dbs                     cluster-auth
 ┌──────────────┐            ┌────────────────────────┐      ┌──────────────────────┐
 │ test-client  │───Bearer──▶│ kube-auth-proxy :4180  │─────▶│ kube-federated-auth  │
-│ (SA token)   │   token    │   ├─▶ aqsh :8080       │ Token│   ├─ cluster-a (local)│
-└──────────────┘            │   └─▶ Redis             │Review│   ├─ cluster-b ──────┐│
-                            └────────────────────────┘      │   └─ cluster-c ───┐  ││
-                                                            └───────────────────┼──┼┘
-                            cluster-b API :6443 ◀───────────────────────────────┘  │
-                            cluster-c API :6443 ◀──────────────────────────────────┘
+│ (SA token)   │   token    │   ├─▶ aqsh :8080       │ Token│   ├─ cluster-auth     │
+└──────────────┘            │   ├─▶ Redis            │Review│   │   (local)         │
+                            │   └─▶ MariaDB          │      │   ├─ cluster-dbs ───┐│
+                            └────────────────────────┘      │   └─ cluster-apps ──┼┤
+                                                            └─────────────────────┼┼┘
+                            cluster-dbs API :6443 ◀───────────────────────────────┘│
+                            cluster-apps API :6443 ◀───────────────────────────────┘
 ```
 
 ## Components
 
 | Cluster | Component | Role |
 |---------|-----------|------|
-| cluster-a | [kube-federated-auth](https://github.com/rophy/kube-federated-auth) | Validates SA tokens from all 3 clusters via JWKS detection + TokenReview forwarding |
-| cluster-b | [aqsh](https://github.com/rophy/aqsh) | Async task queue — executes shell scripts submitted via REST API |
-| cluster-b | [kube-auth-proxy](https://github.com/rophy/kube-auth-proxy) | Sidecar that authenticates requests and sets identity headers for aqsh |
-| cluster-b | Redis | Message broker for aqsh task queue |
-| cluster-c | test-client | Alpine pod with curl/jq that sends authenticated requests to aqsh |
+| cluster-auth | [kube-federated-auth](https://github.com/rophy/kube-federated-auth) | Validates SA tokens from all 3 clusters via JWKS detection + TokenReview forwarding |
+| cluster-dbs | [aqsh](https://github.com/null-ptr-exception/aqsh) | Async task queue — executes runbook scripts submitted via REST API |
+| cluster-dbs | [kube-auth-proxy](https://github.com/rophy/kube-auth-proxy) | Sidecar that authenticates requests and sets identity headers for aqsh |
+| cluster-dbs | Redis | Message broker for aqsh task queue |
+| cluster-dbs | MariaDB (via mariadb-operator) | Database instance managed by the operator |
+| cluster-apps | test-client | Alpine pod with curl/jq that sends authenticated requests to aqsh |
 
 ## Request Flow
 
-1. **test-client** (cluster-c) sends `POST /tasks/hello` with its SA token as Bearer
-2. **kube-auth-proxy** (cluster-b) intercepts the request and sends a TokenReview to kube-federated-auth, authenticating itself with its own SA token
-3. **kube-federated-auth** (cluster-a) validates the caller (kube-auth-proxy) against `authorized_clients`, detects the subject token belongs to cluster-c via JWKS, and forwards the TokenReview to cluster-c's API server
+1. **test-client** (cluster-apps) sends `POST /tasks/hello` with its SA token as Bearer
+2. **kube-auth-proxy** (cluster-dbs) intercepts the request and sends a TokenReview to kube-federated-auth, authenticating itself with its own SA token
+3. **kube-federated-auth** (cluster-auth) validates the caller (kube-auth-proxy) against `authorized_clients`, detects the subject token belongs to cluster-apps via JWKS, and forwards the TokenReview to cluster-apps's API server
 4. **kube-auth-proxy** receives the authenticated identity, sets `X-Forwarded-User` / `X-Forwarded-Groups` / `X-Forwarded-Extra-Cluster-Name` headers, strips `Authorization`, and proxies to aqsh
-5. **aqsh** checks `allowed_groups`, accepts the task, and executes the script
+5. **aqsh** checks `allowed_groups` / `allowed_users`, accepts the task, and executes the script
 
 ## Cross-Cluster Networking
 
@@ -42,8 +44,8 @@ Kind clusters share the `kind` Docker bridge network. All cluster nodes are Dock
 
 | Service | Cluster | NodePort |
 |---------|---------|----------|
-| kube-federated-auth | cluster-a | 30080 |
-| aqsh (via kube-auth-proxy) | cluster-b | 30081 |
+| kube-federated-auth | cluster-auth | 30080 |
+| aqsh (via kube-auth-proxy) | cluster-dbs | 30081 |
 
 Pods in any cluster can reach services in other clusters at `<node-docker-ip>:<nodeport>`.
 
@@ -85,9 +87,9 @@ scripts/
   teardown.sh               # Delete clusters
 
 k8s/
-  cluster-a/                # kube-federated-auth manifests
-  cluster-b/                # aqsh + kube-auth-proxy + Redis manifests
-  cluster-c/                # test-client manifests
+  cluster-auth/             # kube-federated-auth manifests
+  cluster-dbs/              # aqsh + kube-auth-proxy + Redis + MariaDB manifests
+  cluster-apps/             # test-client manifests
 ```
 
 ## Image Versions

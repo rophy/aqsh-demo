@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="${ROOT_DIR}/.env"
 
-CLUSTERS=(cluster-a cluster-b cluster-c)
+CLUSTERS=(cluster-auth cluster-dbs cluster-apps)
 
 echo "=== Creating Kind clusters ==="
 
@@ -24,18 +24,18 @@ get_node_ip() {
   docker inspect "${1}-control-plane" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
 }
 
-CLUSTER_A_IP=$(get_node_ip cluster-a)
-CLUSTER_B_IP=$(get_node_ip cluster-b)
-CLUSTER_C_IP=$(get_node_ip cluster-c)
+CLUSTER_AUTH_IP=$(get_node_ip cluster-auth)
+CLUSTER_DBS_IP=$(get_node_ip cluster-dbs)
+CLUSTER_APPS_IP=$(get_node_ip cluster-apps)
 
-echo "cluster-a: $CLUSTER_A_IP"
-echo "cluster-b: $CLUSTER_B_IP"
-echo "cluster-c: $CLUSTER_C_IP"
+echo "cluster-auth: $CLUSTER_AUTH_IP"
+echo "cluster-dbs:  $CLUSTER_DBS_IP"
+echo "cluster-apps: $CLUSTER_APPS_IP"
 
 cat > "$ENV_FILE" <<EOF
-CLUSTER_A_IP=${CLUSTER_A_IP}
-CLUSTER_B_IP=${CLUSTER_B_IP}
-CLUSTER_C_IP=${CLUSTER_C_IP}
+CLUSTER_AUTH_IP=${CLUSTER_AUTH_IP}
+CLUSTER_DBS_IP=${CLUSTER_DBS_IP}
+CLUSTER_APPS_IP=${CLUSTER_APPS_IP}
 EOF
 
 echo "=== Wrote $ENV_FILE ==="

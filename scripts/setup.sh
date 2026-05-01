@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "========================================="
-echo " aqsh-demo: Multi-Cluster Sandbox Setup"
+echo " db-runbooks: Multi-Cluster Sandbox Setup"
 echo "========================================="
 
 echo ""

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: aqsh
-  namespace: db-runbooks
+  namespace: db-ops
 spec:
   replicas: 1
   selector:

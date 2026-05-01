@@ -8,7 +8,15 @@ Multi-cluster sandbox for database operations automation with aqsh, kube-auth-pr
 |---------|---------|---------|
 | kind-cluster-auth | cluster-auth | kube-federated-auth server |
 | kind-cluster-dbs | cluster-dbs | mariadb-operator + aqsh + kube-auth-proxy + Redis |
-| kind-cluster-apps | cluster-apps | test-client workload |
+| kind-cluster-apps | cluster-apps | test-client workloads |
+
+## Namespaces
+
+| Namespace | Clusters | Purpose |
+|-----------|----------|---------|
+| db-ops | cluster-auth, cluster-dbs, cluster-apps | Control plane (federated auth, aqsh, credentials) |
+| db-1, db-2 | cluster-dbs | Per-application database instances |
+| app-a, app-b | cluster-apps | Per-application client workloads |
 
 Always specify `--context` when running kubectl commands.
 

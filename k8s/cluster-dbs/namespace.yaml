@@ -1,4 +1,14 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: db-runbooks
+  name: db-ops
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: db-1
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: db-2

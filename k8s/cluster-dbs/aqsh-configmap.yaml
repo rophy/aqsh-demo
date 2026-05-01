@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: aqsh-config
-  namespace: db-runbooks
+  namespace: db-ops
 data:
   tasks.yaml: |
     defaults:

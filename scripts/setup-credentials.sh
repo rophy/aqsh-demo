@@ -41,7 +41,7 @@ echo "=== Creating bootstrap tokens for cluster-dbs and cluster-apps ==="
 create_token() {
   local cluster="$1"
   local context="kind-${cluster}"
-  kubectl --context "$context" -n db-runbooks create token kube-federated-auth-reader \
+  kubectl --context "$context" -n db-ops create token kube-federated-auth-reader \
     --duration=168h \
     --audience=https://kubernetes.default.svc.cluster.local
 }
@@ -51,14 +51,14 @@ TOKEN_APPS=$(create_token cluster-apps)
 
 echo "=== Storing CA certs as ConfigMap in cluster-auth ==="
 
-kubectl --context kind-cluster-auth -n db-runbooks create configmap kube-federated-auth-ca-certs \
+kubectl --context kind-cluster-auth -n db-ops create configmap kube-federated-auth-ca-certs \
   --from-literal="cluster-dbs-ca.crt=${CA_DBS}" \
   --from-literal="cluster-apps-ca.crt=${CA_APPS}" \
   --dry-run=client -o yaml | kubectl --context kind-cluster-auth apply -f -
 
 echo "=== Storing tokens as Secret in cluster-auth ==="
 
-kubectl --context kind-cluster-auth -n db-runbooks create secret generic kube-federated-auth-tokens \
+kubectl --context kind-cluster-auth -n db-ops create secret generic kube-federated-auth-tokens \
   --from-literal="cluster-dbs-token=${TOKEN_DBS}" \
   --from-literal="cluster-apps-token=${TOKEN_APPS}" \
   --dry-run=client -o yaml | kubectl --context kind-cluster-auth apply -f -

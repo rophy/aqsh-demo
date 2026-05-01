@@ -53,10 +53,10 @@ else
 fi
 
 echo ""
-echo "=== Test 3: Authenticated task submission ==="
+echo "=== Test 3: Authenticated task submission (app-a) ==="
 
-echo "  \$ kubectl --context kind-cluster-apps -n db-runbooks create token test-client --duration=10m"
-TOKEN=$(kubectl --context kind-cluster-apps -n db-runbooks create token test-client --duration=10m)
+echo "  \$ kubectl --context kind-cluster-apps -n app-a create token test-client --duration=10m"
+TOKEN=$(kubectl --context kind-cluster-apps -n app-a create token test-client --duration=10m)
 echo "  > ${TOKEN:0:32}...${TOKEN: -16} (${#TOKEN} chars)"
 
 echo "  \$ curl -s -X POST ${AQSH_URL}/tasks/hello -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' -d '{\"name\": \"World\"}'"
@@ -134,13 +134,13 @@ else
 fi
 
 echo ""
-echo "=== Test 6: In-pod test from cluster-apps ==="
+echo "=== Test 6: In-pod test from cluster-apps (app-a) ==="
 
-echo "  \$ kubectl --context kind-cluster-apps -n db-runbooks exec <test-client-pod> -- sh -c 'curl -s -w \"%{http_code}\" -X POST http://${CLUSTER_DBS_IP}:30081/tasks/hello -H \"Authorization: Bearer \$(cat /var/run/secrets/tokens/token)\" -H \"Content-Type: application/json\" -d {\"name\":\"from-pod\"}'"
+echo "  \$ kubectl --context kind-cluster-apps -n app-a exec <test-client-pod> -- sh -c 'curl ... http://${CLUSTER_DBS_IP}:30081/tasks/hello'"
 
-TEST_POD=$(kubectl --context kind-cluster-apps -n db-runbooks get pod -l app=test-client -o jsonpath='{.items[0].metadata.name}')
+TEST_POD=$(kubectl --context kind-cluster-apps -n app-a get pod -l app=test-client -o jsonpath='{.items[0].metadata.name}')
 
-IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps -n db-runbooks exec "$TEST_POD" -- \
+IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps -n app-a exec "$TEST_POD" -- \
   sh -c 'curl -s -w "\n%{http_code}" \
     -X POST "http://'"${CLUSTER_DBS_IP}"':30081/tasks/hello" \
     -H "Authorization: Bearer $(cat /var/run/secrets/tokens/token)" \

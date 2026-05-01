@@ -38,6 +38,16 @@ cluster-apps                 cluster-dbs                     cluster-auth
 4. **kube-auth-proxy** receives the authenticated identity, sets `X-Forwarded-User` / `X-Forwarded-Groups` / `X-Forwarded-Extra-Cluster-Name` headers, strips `Authorization`, and proxies to aqsh
 5. **aqsh** checks `allowed_groups` / `allowed_users`, accepts the task, and executes the script
 
+## Namespaces
+
+| Namespace | Clusters | Purpose |
+|-----------|----------|---------|
+| `db-ops` | cluster-auth, cluster-dbs, cluster-apps | Control plane — federated auth, aqsh task runner, cross-cluster credentials |
+| `db-1`, `db-2` | cluster-dbs | Per-application database instances |
+| `app-a`, `app-b` | cluster-apps | Per-application client workloads |
+
+Authorization is configured in aqsh task definitions: each app's ServiceAccount (`app-a/test-client`, `app-b/test-client`) is granted access to specific tasks via `allowed_users`, enforcing which app can operate on which database.
+
 ## Cross-Cluster Networking
 
 Kind clusters share the `kind` Docker bridge network. All cluster nodes are Docker containers with directly reachable IPs. Services are exposed via NodePort:

@@ -38,7 +38,7 @@ kubectl --context kind-cluster-auth apply -f "${ROOT_DIR}/k8s/cluster-auth/deplo
 kubectl --context kind-cluster-auth apply -f "${ROOT_DIR}/k8s/cluster-auth/service.yaml"
 
 echo "Waiting for kube-federated-auth to be ready..."
-kubectl --context kind-cluster-auth -n db-runbooks rollout status deployment/kube-federated-auth --timeout=120s
+kubectl --context kind-cluster-auth -n db-ops rollout status deployment/kube-federated-auth --timeout=120s
 
 echo "=== Step 4: Deploy cluster-dbs (aqsh + kube-auth-proxy + Redis) ==="
 
@@ -51,16 +51,17 @@ envsubst < "${ROOT_DIR}/k8s/cluster-dbs/aqsh-deployment.yaml.tpl" | kubectl --co
 kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/aqsh-service.yaml"
 
 echo "Waiting for Redis to be ready..."
-kubectl --context kind-cluster-dbs -n db-runbooks rollout status deployment/redis --timeout=60s
+kubectl --context kind-cluster-dbs -n db-ops rollout status deployment/redis --timeout=60s
 
 echo "Waiting for aqsh to be ready..."
-kubectl --context kind-cluster-dbs -n db-runbooks rollout status deployment/aqsh --timeout=120s
+kubectl --context kind-cluster-dbs -n db-ops rollout status deployment/aqsh --timeout=120s
 
 echo "=== Step 5: Deploy cluster-apps (test-client) ==="
 
 kubectl --context kind-cluster-apps apply -f "${ROOT_DIR}/k8s/cluster-apps/test-client.yaml"
 
 echo "Waiting for test-client to be ready..."
-kubectl --context kind-cluster-apps -n db-runbooks rollout status deployment/test-client --timeout=60s
+kubectl --context kind-cluster-apps -n app-a rollout status deployment/test-client --timeout=60s
+kubectl --context kind-cluster-apps -n app-b rollout status deployment/test-client --timeout=60s
 
 echo "=== Deployment complete ==="

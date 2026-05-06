@@ -1,0 +1,24 @@
+defaults:
+  timeout: 5m
+  max_retry: 0
+  queue: default
+tasks:
+  hello:
+    script: hello.sh
+    allowed_groups: ["system:serviceaccounts"]
+    input:
+      - name: name
+        env: NAME
+        required: true
+        type: string
+  restart:
+    script: restart.sh
+    description: "Rolling restart of a MariaDB StatefulSet"
+    timeout: 5m
+    allowed_groups: ["system:serviceaccounts"]
+    input:
+      - name: namespace
+        env: DB_NAMESPACE
+        required: true
+        type: string
+        pattern: '^db-[0-9]+$'

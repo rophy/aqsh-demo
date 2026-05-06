@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kube-federated-auth
-  namespace: aqsh-demo
+  namespace: db-ops
 spec:
   replicas: 1
   selector:

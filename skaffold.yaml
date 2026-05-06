@@ -1,0 +1,15 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: db-runbooks
+build:
+  artifacts:
+    - image: aqsh-tasks
+      context: aqsh-tasks
+      docker:
+        dockerfile: Dockerfile
+  local:
+    push: false
+    useBuildkit: true
+deploy:
+  kubectl: {}

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: aqsh
-  namespace: aqsh-demo
+  namespace: db-ops
 spec:
   replicas: 1
   selector:
@@ -16,7 +16,8 @@ spec:
       serviceAccountName: kube-auth-proxy
       containers:
         - name: aqsh
-          image: ghcr.io/null-ptr-exception/aqsh:0.4.0
+          image: aqsh-tasks
+          imagePullPolicy: Never
           env:
             - name: AQSH_MODE
               value: both
@@ -44,20 +45,13 @@ spec:
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
-          volumeMounts:
-            - name: config
-              mountPath: /etc/aqsh
-              readOnly: true
-            - name: tasks
-              mountPath: /tasks
-              readOnly: true
         - name: kube-auth-proxy
           image: ghcr.io/rophy/kube-auth-proxy:0.4.1
           env:
             - name: UPSTREAM
               value: "http://localhost:8080"
             - name: TOKEN_REVIEW_URL
-              value: "http://${CLUSTER_A_IP}:30080"
+              value: "http://${CLUSTER_AUTH_IP}:30080"
             - name: PORT
               value: "4180"
           ports:
@@ -74,17 +68,3 @@ spec:
               port: 4180
             initialDelaySeconds: 5
             periodSeconds: 10
-      volumes:
-        - name: config
-          configMap:
-            name: aqsh-config
-            items:
-              - key: tasks.yaml
-                path: tasks.yaml
-        - name: tasks
-          configMap:
-            name: aqsh-config
-            items:
-              - key: hello.sh
-                path: hello.sh
-            defaultMode: 0755

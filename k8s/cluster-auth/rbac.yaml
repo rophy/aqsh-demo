@@ -2,14 +2,14 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: kube-federated-auth
-  namespace: aqsh-demo
+  namespace: db-ops
 ---
 # Namespaced: secrets access for credential persistence
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: kube-federated-auth
-  namespace: aqsh-demo
+  namespace: db-ops
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -19,7 +19,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: kube-federated-auth
-  namespace: aqsh-demo
+  namespace: db-ops
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -27,7 +27,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: kube-federated-auth
-    namespace: aqsh-demo
+    namespace: db-ops
 ---
 # Cluster-wide: tokenreview for local cluster validation
 apiVersion: rbac.authorization.k8s.io/v1
@@ -50,4 +50,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: kube-federated-auth
-    namespace: aqsh-demo
+    namespace: db-ops

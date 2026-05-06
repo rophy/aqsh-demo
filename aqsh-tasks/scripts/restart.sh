@@ -16,5 +16,5 @@ echo "Rollout complete!"
 jq -n \
   --arg namespace "$DB_NAMESPACE" \
   --arg statefulset "$STS_NAME" \
-  --argjson replicas "$REPLICAS" \
+  --argjson replicas "${REPLICAS:-0}" \
   '{namespace: $namespace, statefulset: $statefulset, replicas: $replicas}' > "$AQSH_RESULT_FILE"

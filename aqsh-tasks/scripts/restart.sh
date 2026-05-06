@@ -13,10 +13,8 @@ kubectl -n "${DB_NAMESPACE}" rollout status statefulset "${STS_NAME}" --timeout=
 REPLICAS=$(kubectl -n "${DB_NAMESPACE}" get statefulset "${STS_NAME}" -o jsonpath='{.status.readyReplicas}')
 
 echo "Rollout complete!"
-cat > "$AQSH_RESULT_FILE" << EOF
-{
-  "namespace": "${DB_NAMESPACE}",
-  "statefulset": "${STS_NAME}",
-  "replicas": ${REPLICAS}
-}
-EOF
+jq -n \
+  --arg namespace "$DB_NAMESPACE" \
+  --arg statefulset "$STS_NAME" \
+  --argjson replicas "$REPLICAS" \
+  '{namespace: $namespace, statefulset: $statefulset, replicas: $replicas}' > "$AQSH_RESULT_FILE"

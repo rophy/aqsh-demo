@@ -24,7 +24,11 @@ Always specify `--context` when running kubectl commands.
 
 - `ghcr.io/rophy/kube-federated-auth:3.2.0`
 - `ghcr.io/rophy/kube-auth-proxy:0.4.1`
-- `ghcr.io/null-ptr-exception/aqsh:0.4.0`
+- `ghcr.io/null-ptr-exception/aqsh:0.4.0` (base for `aqsh-tasks` custom image)
+
+## aqsh Tasks
+
+Task scripts live in `aqsh-tasks/scripts/` and are baked into the `aqsh-tasks` Docker image via `aqsh-tasks/Dockerfile`. Skaffold manages the build lifecycle.
 
 ## Quick Start
 

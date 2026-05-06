@@ -65,6 +65,7 @@ Pods in any cluster can reach services in other clusters at `<node-docker-ip>:<n
 - [kind](https://kind.sigs.k8s.io/)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [Helm](https://helm.sh/)
+- [Skaffold](https://skaffold.dev/)
 - [jq](https://jqlang.github.io/jq/)
 - curl
 
@@ -80,6 +81,17 @@ Pods in any cluster can reach services in other clusters at `<node-docker-ip>:<n
 ./scripts/test.sh                # Run end-to-end tests
 ```
 
+## Development
+
+Task scripts live in `aqsh-tasks/scripts/`. To iterate on tasks:
+
+```bash
+# Build and load into Kind cluster
+skaffold build --tag=latest
+kind load docker-image aqsh-tasks:latest --name cluster-dbs
+kubectl --context kind-cluster-dbs -n db-ops rollout restart deployment/aqsh
+```
+
 ## Teardown
 
 ```bash
@@ -89,11 +101,18 @@ Pods in any cluster can reach services in other clusters at `<node-docker-ip>:<n
 ## Project Structure
 
 ```
+aqsh-tasks/
+  Dockerfile                # Custom image: aqsh base + task scripts
+  tasks.yaml                # Task definitions (hello, restart)
+  scripts/
+    hello.sh                # Simple greeting task
+    restart.sh              # Rolling restart of MariaDB StatefulSet
+
 scripts/
   setup.sh                  # Orchestrator
   setup-clusters.sh         # Create Kind clusters, extract IPs → .env
   setup-credentials.sh      # Bootstrap cross-cluster CA certs + tokens
-  deploy.sh                 # Deploy manifests in dependency order
+  deploy.sh                 # Build image + deploy manifests in dependency order
   test.sh                   # End-to-end validation
   teardown.sh               # Delete clusters
 
@@ -110,6 +129,7 @@ k8s/
 | ghcr.io/rophy/kube-federated-auth | 3.2.0 |
 | ghcr.io/rophy/kube-auth-proxy | 0.4.1 |
 | ghcr.io/null-ptr-exception/aqsh | 0.4.0 |
+| aqsh-tasks | local build (Skaffold) |
 | mariadb-operator (Helm) | latest |
 | mariadb | 10.6, 10.11, 11.4 |
 | redis | 7-alpine |

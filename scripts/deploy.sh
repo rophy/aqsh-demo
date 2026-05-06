@@ -32,7 +32,6 @@ echo "=== Step 3: Deploy cluster-auth (kube-federated-auth) ==="
 
 kubectl --context kind-cluster-auth apply -f "${ROOT_DIR}/k8s/cluster-auth/rbac.yaml"
 
-# Process configmap template
 envsubst < "${ROOT_DIR}/k8s/cluster-auth/configmap.yaml.tpl" | kubectl --context kind-cluster-auth apply -f -
 
 kubectl --context kind-cluster-auth apply -f "${ROOT_DIR}/k8s/cluster-auth/deployment.yaml"
@@ -66,12 +65,15 @@ kubectl --context kind-cluster-dbs -n db-1 wait --for=condition=Ready mariadb/ma
 kubectl --context kind-cluster-dbs -n db-2 wait --for=condition=Ready mariadb/mariadb --timeout=180s
 kubectl --context kind-cluster-dbs -n db-3 wait --for=condition=Ready mariadb/mariadb --timeout=180s
 
-echo "=== Step 6: Deploy cluster-dbs (aqsh + kube-auth-proxy + Redis) ==="
+echo "=== Step 6: Build and load aqsh-tasks image ==="
+
+skaffold build --filename="${ROOT_DIR}/skaffold.yaml" --tag=latest --quiet
+kind load docker-image aqsh-tasks:latest --name cluster-dbs
+
+echo "=== Step 7: Deploy cluster-dbs (aqsh + kube-auth-proxy + Redis) ==="
 
 kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/redis.yaml"
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/aqsh-configmap.yaml"
 
-# Process deployment template
 envsubst < "${ROOT_DIR}/k8s/cluster-dbs/aqsh-deployment.yaml.tpl" | kubectl --context kind-cluster-dbs apply -f -
 
 kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/aqsh-service.yaml"
@@ -82,7 +84,7 @@ kubectl --context kind-cluster-dbs -n db-ops rollout status deployment/redis --t
 echo "Waiting for aqsh to be ready..."
 kubectl --context kind-cluster-dbs -n db-ops rollout status deployment/aqsh --timeout=120s
 
-echo "=== Step 7: Deploy cluster-apps (test-client) ==="
+echo "=== Step 8: Deploy cluster-apps (test-client) ==="
 
 kubectl --context kind-cluster-apps apply -f "${ROOT_DIR}/k8s/cluster-apps/test-client.yaml"
 

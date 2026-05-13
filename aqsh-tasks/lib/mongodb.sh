@@ -134,9 +134,12 @@ _mongosh_eval() {
   else
     # ── URI mode ──────────────────────────────────────────────────────────
     local base_uri="${MONGO_URI%/}"
+    local uri_base existing_query
     # Append timeout as a query parameter; handle existing ? gracefully.
     if [[ "$base_uri" == *'?'* ]]; then
-      uri="${base_uri}/${database}?serverSelectionTimeoutMS=${MONGO_TIMEOUT}"
+      uri_base="${base_uri%%\?*}"
+      existing_query="${base_uri#*\?}"
+      uri="${uri_base}/${database}?${existing_query}&serverSelectionTimeoutMS=${MONGO_TIMEOUT}"
     else
       uri="${base_uri}/${database}?serverSelectionTimeoutMS=${MONGO_TIMEOUT}"
     fi

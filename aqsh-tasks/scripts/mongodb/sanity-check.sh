@@ -31,21 +31,43 @@ _CRED_SECRET="${MONGO_CRED_SECRET:-mongodb-credentials}"
 _CRED_USER_KEY="${MONGO_CRED_USER_KEY:-MONGO_ROOT_USER}"
 _CRED_PASS_KEY="${MONGO_CRED_PASS_KEY:-MONGO_ROOT_PASS}"
 
+# ── Preflight failure writer ──────────────────────────────────────────────────
+# Called when a pre-check step fails before the main check loop runs.
+# Writes a structured critical result to $AQSH_RESULT_FILE so aqsh always
+# receives a valid task result rather than a raw execution failure.
+_preflight_critical() {
+  local reason="${1:-preflight check failed}"
+  log_error "mongo-sanity-check" "Preflight failed: ${reason}"
+  jq -n \
+    --arg  status    "critical" \
+    --arg  reason    "${reason}" \
+    --arg  namespace "${DB_NAMESPACE}" \
+    '{status: $status, namespace: $namespace, reason: $reason, pass: 0, warn: 0, fail: 1, total: 1}' \
+    > "$AQSH_RESULT_FILE"
+  exit 1
+}
+
 # ── Read credentials from K8s Secret ─────────────────────────────────────────
 MONGO_USER=$(kubectl -n "${DB_NAMESPACE}" get secret "${_CRED_SECRET}" \
-  -o jsonpath="{.data.${_CRED_USER_KEY}}" | base64 -d)
+  -o jsonpath="{.data.${_CRED_USER_KEY}}" 2>/dev/null | base64 -d) || \
+  _preflight_critical "cannot read '${_CRED_USER_KEY}' from secret '${_CRED_SECRET}' in namespace '${DB_NAMESPACE}' — check RBAC and secret name"
 MONGO_PASS=$(kubectl -n "${DB_NAMESPACE}" get secret "${_CRED_SECRET}" \
-  -o jsonpath="{.data.${_CRED_PASS_KEY}}" | base64 -d)
+  -o jsonpath="{.data.${_CRED_PASS_KEY}}" 2>/dev/null | base64 -d) || \
+  _preflight_critical "cannot read '${_CRED_PASS_KEY}' from secret '${_CRED_SECRET}' in namespace '${DB_NAMESPACE}' — check RBAC and secret name"
 
 # ── Resolve primary via headless FQDN ────────────────────────────────────────
 # Seed = first pod of the StatefulSet: <sts>-0.<svc>.<ns>.svc.cluster.local
 _SEED_HOST="${_STS_NAME}-0.${_STS_NAME}.${DB_NAMESPACE}.svc.cluster.local"
 _SEED_PORT="27017"
 
-_PRIMARY_OUTPUT=$(mongo_resolve_primary "$_SEED_HOST" "$_SEED_PORT" "$MONGO_USER" "$MONGO_PASS" "admin")
+_PRIMARY_OUTPUT=$(mongo_resolve_primary "$_SEED_HOST" "$_SEED_PORT" "$MONGO_USER" "$MONGO_PASS" "admin") || \
+  _preflight_critical "cannot resolve MongoDB primary via seed ${_SEED_HOST}:${_SEED_PORT} — check that the StatefulSet pods are running and credentials are correct"
 MONGO_HOST=$(echo "$_PRIMARY_OUTPUT" | sed -n '1p')
 _RESOLVED_PORT=$(echo "$_PRIMARY_OUTPUT" | sed -n '2p')
 MONGO_PORT="${_RESOLVED_PORT:-27017}"
+
+[[ -z "$MONGO_HOST" ]] && \
+  _preflight_critical "mongo_resolve_primary returned empty host for seed ${_SEED_HOST}:${_SEED_PORT} — no primary elected or seed unreachable"
 
 log_info "mongo-sanity-check" "Connecting to primary: ${MONGO_HOST}:${MONGO_PORT}"
 

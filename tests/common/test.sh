@@ -75,8 +75,7 @@ HELLO_TASK_ID=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.
 
 if [ -z "$HELLO_TASK_ID" ]; then
   fail "could not extract task ID from response"
-  return
-fi
+else
 
 echo ""
 echo "=== Test 4: Task completion (polling) ==="
@@ -124,6 +123,8 @@ else
   fail "logs missing expected output"
 fi
 
+fi # end HELLO_TASK_ID guard
+
 echo ""
 echo "=== Test 5b: common/hello smoke test via aqsh-mongodb ==="
 
@@ -147,48 +148,50 @@ fi
 echo ""
 echo "=== Test 6: In-pod test from cluster-apps (app-a) ==="
 
+TEST_POD=""
 if ! kubectl --context kind-cluster-apps -n app-a wait --for=condition=Ready pod -l app=test-client --timeout=120s >/dev/null 2>&1; then
   fail "test-client pod not ready within 120s; skipping in-pod tests"
-  return
-fi
-TEST_POD=$(kubectl --context kind-cluster-apps -n app-a get pod -l app=test-client -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-if [ -z "$TEST_POD" ]; then
-  fail "could not find test-client pod; skipping in-pod tests"
-  return
-fi
-
-IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps -n app-a exec "$TEST_POD" -- \
-  sh -c 'curl -s -w "\n%{http_code}" \
-    -X POST "http://'"${CLUSTER_DBS_IP}"':30081/tasks/common%2Fhello" \
-    -H "Authorization: Bearer $(cat /var/run/secrets/tokens/token)" \
-    -H "Content-Type: application/json" \
-    -d "{\"name\": \"from-pod\"}"' 2>/dev/null || echo -e "\n000")
-
-IN_POD_CODE=$(echo "$IN_POD_RESPONSE" | tail -1)
-IN_POD_BODY=$(echo "$IN_POD_RESPONSE" | sed '$d')
-echo "  > HTTP $IN_POD_CODE (aqsh-mariadb :30081)"
-echo "  > $IN_POD_BODY"
-
-if [ "$IN_POD_CODE" = "202" ]; then
-  pass "in-pod request to aqsh-mariadb returned 202"
 else
-  fail "in-pod request to aqsh-mariadb returned $IN_POD_CODE (expected 202)"
+  TEST_POD=$(kubectl --context kind-cluster-apps -n app-a get pod -l app=test-client -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  if [ -z "$TEST_POD" ]; then
+    fail "could not find test-client pod; skipping in-pod tests"
+  fi
 fi
 
-IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps -n app-a exec "$TEST_POD" -- \
-  sh -c 'curl -s -w "\n%{http_code}" \
-    -X POST "http://'"${CLUSTER_DBS_IP}"':30082/tasks/common%2Fhello" \
-    -H "Authorization: Bearer $(cat /var/run/secrets/tokens/token)" \
-    -H "Content-Type: application/json" \
-    -d "{\"name\": \"from-pod\"}"' 2>/dev/null || echo -e "\n000")
+if [ -n "$TEST_POD" ]; then
+  IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps -n app-a exec "$TEST_POD" -- \
+    sh -c 'curl -s -w "\n%{http_code}" \
+      -X POST "http://'"${CLUSTER_DBS_IP}"':30081/tasks/common%2Fhello" \
+      -H "Authorization: Bearer $(cat /var/run/secrets/tokens/token)" \
+      -H "Content-Type: application/json" \
+      -d "{\"name\": \"from-pod\"}"' 2>/dev/null || echo -e "\n000")
 
-IN_POD_CODE=$(echo "$IN_POD_RESPONSE" | tail -1)
-IN_POD_BODY=$(echo "$IN_POD_RESPONSE" | sed '$d')
-echo "  > HTTP $IN_POD_CODE (aqsh-mongodb :30082)"
-echo "  > $IN_POD_BODY"
+  IN_POD_CODE=$(echo "$IN_POD_RESPONSE" | tail -1)
+  IN_POD_BODY=$(echo "$IN_POD_RESPONSE" | sed '$d')
+  echo "  > HTTP $IN_POD_CODE (aqsh-mariadb :30081)"
+  echo "  > $IN_POD_BODY"
 
-if [ "$IN_POD_CODE" = "202" ]; then
-  pass "in-pod request to aqsh-mongodb returned 202"
-else
-  fail "in-pod request to aqsh-mongodb returned $IN_POD_CODE (expected 202)"
+  if [ "$IN_POD_CODE" = "202" ]; then
+    pass "in-pod request to aqsh-mariadb returned 202"
+  else
+    fail "in-pod request to aqsh-mariadb returned $IN_POD_CODE (expected 202)"
+  fi
+
+  IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps -n app-a exec "$TEST_POD" -- \
+    sh -c 'curl -s -w "\n%{http_code}" \
+      -X POST "http://'"${CLUSTER_DBS_IP}"':30082/tasks/common%2Fhello" \
+      -H "Authorization: Bearer $(cat /var/run/secrets/tokens/token)" \
+      -H "Content-Type: application/json" \
+      -d "{\"name\": \"from-pod\"}"' 2>/dev/null || echo -e "\n000")
+
+  IN_POD_CODE=$(echo "$IN_POD_RESPONSE" | tail -1)
+  IN_POD_BODY=$(echo "$IN_POD_RESPONSE" | sed '$d')
+  echo "  > HTTP $IN_POD_CODE (aqsh-mongodb :30082)"
+  echo "  > $IN_POD_BODY"
+
+  if [ "$IN_POD_CODE" = "202" ]; then
+    pass "in-pod request to aqsh-mongodb returned 202"
+  else
+    fail "in-pod request to aqsh-mongodb returned $IN_POD_CODE (expected 202)"
+  fi
 fi

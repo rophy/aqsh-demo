@@ -1598,9 +1598,11 @@ mongo_resolve_primary() {
   local pass="${4:-}"
   local authdb="${5:-admin}"
 
-  local uri
+  local uri enc_user enc_pass
   if [[ -n "$user" && -n "$pass" ]]; then
-    uri="mongodb://${user}:${pass}@${seed_host}:${seed_port}/${authdb}?authSource=${authdb}&connectTimeoutMS=5000&serverSelectionTimeoutMS=5000"
+    enc_user=$(_mongo_uri_percent_encode "$user")
+    enc_pass=$(_mongo_uri_percent_encode "$pass")
+    uri="mongodb://${enc_user}:${enc_pass}@${seed_host}:${seed_port}/${authdb}?authSource=${authdb}&connectTimeoutMS=5000&serverSelectionTimeoutMS=5000"
   else
     uri="mongodb://${seed_host}:${seed_port}/${authdb}?connectTimeoutMS=5000&serverSelectionTimeoutMS=5000"
   fi

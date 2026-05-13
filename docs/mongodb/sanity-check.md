@@ -54,7 +54,7 @@ Served by **aqsh-mongodb** on NodePort `30082`.
 ```json
 {
   "id":     "d5a00329-7870-482c-89c2-54ab9b8dec08",
-  "queue":  "default",
+  "queue":  "mongodb",
   "status": "pending"
 }
 ```

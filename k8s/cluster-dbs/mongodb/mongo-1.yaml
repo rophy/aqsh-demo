@@ -18,6 +18,11 @@ spec:
         app: mongodb
         app.kubernetes.io/name: mongodb
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
       containers:
         - name: mongodb
           image: mongo:7
@@ -34,9 +39,28 @@ spec:
                 secretKeyRef:
                   name: mongodb-credentials
                   key: MONGO_ROOT_PASS
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+            readOnlyRootFilesystem: false
           readinessProbe:
             exec:
-              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+              command:
+                - mongosh
+                - --quiet
+                - --username
+                - $(MONGO_INITDB_ROOT_USERNAME)
+                - --password
+                - $(MONGO_INITDB_ROOT_PASSWORD)
+                - --authenticationDatabase
+                - admin
+                - --eval
+                - db.adminCommand('ping').ok
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5

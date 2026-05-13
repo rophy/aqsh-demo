@@ -93,6 +93,7 @@ main() {
   fi
 
   export K8S_NAMESPACE
+  export LOCK_QUEUE_WARN LOCK_QUEUE_FAIL STANDALONE_OK
 
   log_set_level "${LOG_LEVEL:-INFO}"
 

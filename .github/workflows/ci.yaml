@@ -44,8 +44,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Build aqsh-tasks image
-        run: docker build -t aqsh-tasks:ci ./aqsh-tasks
+      - name: Build aqsh-mariadb image
+        run: docker build --build-arg TASKS_YAML=tasks-mariadb.yaml -t aqsh-mariadb:ci ./aqsh-tasks
+
+      - name: Build aqsh-mongodb image
+        run: docker build --build-arg TASKS_YAML=tasks-mongodb.yaml -t aqsh-mongodb:ci ./aqsh-tasks
 
   integration:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')

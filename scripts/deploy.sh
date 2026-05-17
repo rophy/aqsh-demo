@@ -72,10 +72,11 @@ echo "=== Step 5b: Deploy MongoDB instances ==="
 
 echo "Creating MongoDB credentials secrets..."
 for idx in 1 2 3; do
-  kubectl --context kind-cluster-dbs -n "mongo-${idx}" create secret generic mongodb-credentials \
-    --from-literal="MONGO_ROOT_USER=mongo${idx}-admin" \
-    --from-literal="MONGO_ROOT_PASS=$(openssl rand -base64 16 | tr -d '=+/')" \
-    --dry-run=client -o yaml | kubectl --context kind-cluster-dbs apply -f -
+  if ! kubectl --context kind-cluster-dbs -n "mongo-${idx}" get secret mongodb-credentials &>/dev/null; then
+    kubectl --context kind-cluster-dbs -n "mongo-${idx}" create secret generic mongodb-credentials \
+      --from-literal="MONGO_ROOT_USER=mongo${idx}-admin" \
+      --from-literal="MONGO_ROOT_PASS=$(openssl rand -base64 16 | tr -d '=+/')"
+  fi
 done
 
 kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mongodb/mongo-1.yaml"

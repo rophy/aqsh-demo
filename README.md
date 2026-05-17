@@ -141,12 +141,13 @@ aqsh-tasks/
 ├── Dockerfile              # Installs kubectl + mongosh + mariadb-client; ARG TASKS_YAML selects config
 ├── tasks-mariadb.yaml      # MariaDB task definitions (restart, common/hello)
 ├── tasks-mongodb.yaml      # MongoDB task definitions (restart, sanity-check, common/hello)
-├── lib/                    # Shared Bash libraries (vendored from mongodb-manager)
-│   ├── logging.sh          # Structured logging with levels
-│   ├── response.sh         # Standard JSON response builder
-│   ├── k8s.sh              # 40+ kubectl helper functions
-│   ├── mongodb.sh          # 30+ mongosh helper functions
-│   └── sanity_check.sh     # 3-layer MongoDB health check
+├── lib/                    # Shared Bash libraries
+│   ├── logging.sh          # Structured logging with levels (log_info/warn/error)
+│   ├── response.sh         # Standard JSON response builder (response_ok/response_err)
+│   ├── k8s.sh              # kubectl wrappers with retry and wait helpers
+│   ├── mongodb.sh          # mongosh wrappers, URI builder, primary resolver
+│   ├── mongodb_constant.sh # Sanity-check scoring constants and report helpers
+│   └── custom.sh           # Extensible per-deployment custom check hooks
 └── scripts/
     ├── common/hello.sh
     ├── mariadb/restart.sh

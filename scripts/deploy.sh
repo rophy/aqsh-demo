@@ -63,12 +63,16 @@ deploy_region() {
   kubectl --context "$context" -n mongo-2 wait --for=condition=Ready pod -l app=mongodb --timeout=180s
   kubectl --context "$context" -n mongo-3 wait --for=condition=Ready pod -l app=mongodb --timeout=180s
 
-  echo "--- Deploy nginx (needed for MongoDB RS NodePort addresses) ---"
+  echo "--- Deploy aqsh Services (required before nginx to avoid DNS startup failure) ---"
+  kubectl --context "$context" apply -f "${dir}/dbs/aqsh-mariadb-service.yaml"
+  kubectl --context "$context" apply -f "${dir}/dbs/aqsh-mongodb-service.yaml"
+
+  echo "--- Deploy nginx ---"
   kubectl --context "$context" apply -f "${dir}/nginx/configmap.yaml.tpl"
   kubectl --context "$context" apply -f "${dir}/nginx/deployment.yaml"
   kubectl --context "$context" apply -f "${dir}/nginx/service.yaml"
 
-  echo "--- Initialise MongoDB replica sets ---"
+  echo "--- Initialise MongoDB replica sets (internal DNS; valid RS member address for mongod self-check) ---"
   local CLUSTER_IP
   [[ "$cluster" == "cluster-region-a" ]] && CLUSTER_IP="$REGION_A_IP"
   [[ "$cluster" == "cluster-region-b" ]] && CLUSTER_IP="$REGION_B_IP"
@@ -82,10 +86,14 @@ deploy_region() {
       get secret mongodb-credentials -o jsonpath='{.data.MONGO_ROOT_USER}' | base64 -d)
     ROOT_PASS=$(kubectl --context "$context" -n "$ns" \
       get secret mongodb-credentials -o jsonpath='{.data.MONGO_ROOT_PASS}' | base64 -d)
+    # Use internal headless DNS — MongoDB requires the member host to resolve to
+    # one of mongod's own bound IPs (pod IP). NodePort (CLUSTER_IP:port) is the
+    # node IP, not the pod IP, so MongoDB rejects it during initiate.
+    # For multi-region expansion (rs.add secondary) the NodePort is used later.
     kubectl --context "$context" -n "$ns" exec mongodb-0 -- \
       mongosh --quiet --norc -u "$ROOT_USER" -p "$ROOT_PASS" --authenticationDatabase admin \
       --eval \
-      "try { rs.initiate({_id:'${RS_NAME}',members:[{_id:0,host:'${CLUSTER_IP}:${STREAM_PORT}'}]}) } catch(e) { if(e.codeName!='AlreadyInitialized') throw e }" \
+      "try { rs.initiate({_id:'${RS_NAME}',members:[{_id:0,host:'mongodb-0.mongodb.${ns}.svc.cluster.local:27017'}]}) } catch(e) { if(e.codeName!='AlreadyInitialized') throw e }" \
       2>/dev/null || true
     ns_idx=$((ns_idx + 1))
   done

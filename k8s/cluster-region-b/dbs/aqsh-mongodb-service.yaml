@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: aqsh-mongodb
+  namespace: db-ops
+spec:
+  type: NodePort
+  selector:
+    app: aqsh-mongodb
+  ports:
+    - name: proxy
+      port: 4180
+      targetPort: 4180
+      nodePort: 30083

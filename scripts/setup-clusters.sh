@@ -5,9 +5,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="${ROOT_DIR}/.env"
 
-CLUSTERS=(cluster-auth cluster-dbs cluster-apps)
+MODE="${MODE:-single}"
 
-echo "=== Creating Kind clusters ==="
+echo "=== Creating Kind clusters (MODE=${MODE}) ==="
+
+CLUSTERS=(cluster-region-a cluster-apps-minio)
+[[ "$MODE" == "multi" ]] && CLUSTERS+=(cluster-region-b)
 
 for cluster in "${CLUSTERS[@]}"; do
   if kind get clusters 2>/dev/null | grep -qx "$cluster"; then
@@ -18,24 +21,28 @@ for cluster in "${CLUSTERS[@]}"; do
   fi
 done
 
-echo "=== Extracting Docker IPs ==="
+echo "=== Extracting Docker node IPs ==="
 
 get_node_ip() {
   docker inspect "${1}-control-plane" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
 }
 
-CLUSTER_AUTH_IP=$(get_node_ip cluster-auth)
-CLUSTER_DBS_IP=$(get_node_ip cluster-dbs)
-CLUSTER_APPS_IP=$(get_node_ip cluster-apps)
+REGION_A_IP=$(get_node_ip cluster-region-a)
+APPS_MINIO_IP=$(get_node_ip cluster-apps-minio)
 
-echo "cluster-auth: $CLUSTER_AUTH_IP"
-echo "cluster-dbs:  $CLUSTER_DBS_IP"
-echo "cluster-apps: $CLUSTER_APPS_IP"
+echo "cluster-region-a:   $REGION_A_IP"
+echo "cluster-apps-minio: $APPS_MINIO_IP"
 
 cat > "$ENV_FILE" <<EOF
-CLUSTER_AUTH_IP=${CLUSTER_AUTH_IP}
-CLUSTER_DBS_IP=${CLUSTER_DBS_IP}
-CLUSTER_APPS_IP=${CLUSTER_APPS_IP}
+MODE=${MODE}
+REGION_A_IP=${REGION_A_IP}
+APPS_MINIO_IP=${APPS_MINIO_IP}
 EOF
+
+if [[ "$MODE" == "multi" ]]; then
+  REGION_B_IP=$(get_node_ip cluster-region-b)
+  echo "cluster-region-b:   $REGION_B_IP"
+  echo "REGION_B_IP=${REGION_B_IP}" >> "$ENV_FILE"
+fi
 
 echo "=== Wrote $ENV_FILE ==="

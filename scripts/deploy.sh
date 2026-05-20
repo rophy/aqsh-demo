@@ -7,122 +7,140 @@ ENV_FILE="${ROOT_DIR}/.env"
 
 # shellcheck source=/dev/null
 source "$ENV_FILE"
-export CLUSTER_AUTH_IP CLUSTER_DBS_IP CLUSTER_APPS_IP
+export REGION_A_IP APPS_MINIO_IP
+REGION_B_IP="${REGION_B_IP:-}"
+export REGION_B_IP
+MODE="${MODE:-single}"
+MONGO_FLAVOR="${MONGO_FLAVOR:-official}"
 
-echo "=== Step 1: Deploy namespaces and RBAC ==="
+deploy_region() {
+  local cluster="$1"           # e.g. cluster-region-a
+  local context="kind-${cluster}"
+  local dir="${ROOT_DIR}/k8s/${cluster}"
+  local REMOTE_VAR="REGION_B_IP"
+  [[ "$cluster" == "cluster-region-b" ]] && REMOTE_VAR="REGION_A_IP"
+  export REMOTE_VAR
 
-kubectl --context kind-cluster-auth apply -f "${ROOT_DIR}/k8s/cluster-auth/namespace.yaml"
+  echo ""
+  echo "=== Deploying to ${cluster} ==="
 
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/namespace.yaml"
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/federated-auth-rbac.yaml"
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/aqsh-rbac.yaml"
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mariadb/rbac.yaml"
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mongodb/rbac.yaml"
+  echo "--- Namespaces & RBAC ---"
+  kubectl --context "$context" apply -f "${dir}/dbs/namespace.yaml"
+  kubectl --context "$context" apply -f "${dir}/dbs/federated-auth-rbac.yaml"
+  kubectl --context "$context" apply -f "${dir}/dbs/aqsh-rbac.yaml"
+  kubectl --context "$context" apply -f "${dir}/dbs/mariadb/rbac.yaml"
+  kubectl --context "$context" apply -f "${dir}/dbs/mongodb/rbac.yaml"
+  kubectl --context "$context" apply -f "${dir}/auth/namespace.yaml"
 
-kubectl --context kind-cluster-apps apply -f "${ROOT_DIR}/k8s/cluster-apps/namespace.yaml"
-kubectl --context kind-cluster-apps apply -f "${ROOT_DIR}/k8s/cluster-apps/federated-auth-rbac.yaml"
+  echo "--- kube-federated-auth ---"
+  kubectl --context "$context" apply -f "${dir}/auth/rbac.yaml"
+  envsubst < "${dir}/auth/configmap.yaml.tpl" | kubectl --context "$context" apply -f -
+  kubectl --context "$context" apply -f "${dir}/auth/deployment.yaml"
+  kubectl --context "$context" apply -f "${dir}/auth/service.yaml"
+  kubectl --context "$context" -n db-ops rollout status deployment/kube-federated-auth --timeout=120s
 
-echo "=== Step 2: Bootstrap credentials ==="
+  echo "--- mariadb-operator ---"
+  helm repo add mariadb-operator https://helm.mariadb.com/mariadb-operator 2>/dev/null || true
+  helm repo update mariadb-operator
+  helm upgrade --install mariadb-operator-crds mariadb-operator/mariadb-operator-crds \
+    --kube-context "$context" --wait
+  helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+    --kube-context "$context" --namespace db-ops --wait
 
+  echo "--- MariaDB instances ---"
+  kubectl --context "$context" apply -f "${dir}/dbs/mariadb/mariadb-1.yaml"
+  kubectl --context "$context" apply -f "${dir}/dbs/mariadb/mariadb-2.yaml"
+  kubectl --context "$context" apply -f "${dir}/dbs/mariadb/mariadb-3.yaml"
+  kubectl --context "$context" -n mariadb-1 wait --for=condition=Ready mariadb/mariadb --timeout=180s
+  kubectl --context "$context" -n mariadb-2 wait --for=condition=Ready mariadb/mariadb --timeout=180s
+  kubectl --context "$context" -n mariadb-3 wait --for=condition=Ready mariadb/mariadb --timeout=180s
+
+  echo "--- MongoDB instances (flavor: ${MONGO_FLAVOR}) ---"
+  kubectl --context "$context" apply -f "${dir}/dbs/mongodb/mongo-1.yaml"
+  kubectl --context "$context" apply -f "${dir}/dbs/mongodb/mongo-2.yaml"
+  kubectl --context "$context" apply -f "${dir}/dbs/mongodb/mongo-3.yaml"
+  kubectl --context "$context" -n mongo-1 wait --for=condition=Ready pod -l app=mongodb --timeout=180s
+  kubectl --context "$context" -n mongo-2 wait --for=condition=Ready pod -l app=mongodb --timeout=180s
+  kubectl --context "$context" -n mongo-3 wait --for=condition=Ready pod -l app=mongodb --timeout=180s
+
+  echo "--- Initialise MongoDB replica sets ---"
+  for ns in mongo-1 mongo-2 mongo-3; do
+    RS_NAME="rs-${ns}"
+    POD="${cluster}-control-plane"
+    kubectl --context "$context" -n "$ns" exec mongodb-0 -- \
+      mongosh --quiet --norc --eval \
+      "try { rs.initiate({_id:'${RS_NAME}',members:[{_id:0,host:'mongodb-0.mongodb.${ns}.svc.cluster.local:27017'}]}) } catch(e) { if(e.codeName!='AlreadyInitialized') throw e }" \
+      2>/dev/null || true
+  done
+
+  echo "--- Build & load aqsh images ---"
+  skaffold build --filename="${ROOT_DIR}/skaffold.yaml" --tag=latest --quiet
+  kind load docker-image aqsh-mariadb:latest --name "$cluster"
+  kind load docker-image aqsh-mongodb:latest --name "$cluster"
+
+  echo "--- Deploy Redis + aqsh ---"
+  kubectl --context "$context" apply -f "${dir}/dbs/redis.yaml"
+  envsubst < "${dir}/dbs/secrets.yaml.tpl" | kubectl --context "$context" apply -f -
+  envsubst < "${dir}/dbs/aqsh-mariadb-deployment.yaml.tpl" | kubectl --context "$context" apply -f -
+  kubectl --context "$context" apply -f "${dir}/dbs/aqsh-mariadb-service.yaml"
+  envsubst < "${dir}/dbs/aqsh-mongodb-deployment.yaml.tpl" | kubectl --context "$context" apply -f -
+  kubectl --context "$context" apply -f "${dir}/dbs/aqsh-mongodb-service.yaml"
+  kubectl --context "$context" -n db-ops rollout restart deployment/aqsh-mariadb
+  kubectl --context "$context" -n db-ops rollout restart deployment/aqsh-mongodb
+
+  echo "--- Deploy nginx ---"
+  kubectl --context "$context" apply -f "${dir}/nginx/configmap.yaml.tpl"
+  kubectl --context "$context" apply -f "${dir}/nginx/deployment.yaml"
+  kubectl --context "$context" apply -f "${dir}/nginx/service.yaml"
+
+  echo "--- Wait for aqsh & nginx ---"
+  kubectl --context "$context" -n db-ops rollout status deployment/redis --timeout=60s
+  kubectl --context "$context" -n db-ops rollout status deployment/aqsh-mariadb --timeout=120s
+  kubectl --context "$context" -n db-ops rollout status deployment/aqsh-mongodb --timeout=120s
+  kubectl --context "$context" -n db-ops rollout status deployment/nginx --timeout=60s
+}
+
+echo "=== Step 1: Deploy namespaces + bootstrap credentials ==="
+kubectl --context kind-cluster-region-a apply -f "${ROOT_DIR}/k8s/cluster-region-a/dbs/namespace.yaml"
+kubectl --context kind-cluster-region-a apply -f "${ROOT_DIR}/k8s/cluster-region-a/dbs/federated-auth-rbac.yaml"
+kubectl --context kind-cluster-region-a apply -f "${ROOT_DIR}/k8s/cluster-region-a/auth/namespace.yaml"
+
+if [[ "$MODE" == "multi" ]]; then
+  kubectl --context kind-cluster-region-b apply -f "${ROOT_DIR}/k8s/cluster-region-b/dbs/namespace.yaml"
+  kubectl --context kind-cluster-region-b apply -f "${ROOT_DIR}/k8s/cluster-region-b/dbs/federated-auth-rbac.yaml"
+  kubectl --context kind-cluster-region-b apply -f "${ROOT_DIR}/k8s/cluster-region-b/auth/namespace.yaml"
+fi
+
+kubectl --context kind-cluster-apps-minio apply -f "${ROOT_DIR}/k8s/cluster-apps-minio/namespace.yaml"
+
+echo "=== Step 2: Bootstrap cross-cluster credentials ==="
 "${SCRIPT_DIR}/setup-credentials.sh"
-
-# Re-source to pick up ISSUER_DBS and ISSUER_APPS added by setup-credentials.sh
-# shellcheck source=/dev/null
 source "$ENV_FILE"
-export ISSUER_DBS ISSUER_APPS
+export ISSUER_REGION_A ISSUER_APPS_MINIO
+ISSUER_REGION_B="${ISSUER_REGION_B:-}"
+export ISSUER_REGION_B
 
-echo "=== Step 3: Deploy cluster-auth (kube-federated-auth) ==="
+echo "=== Step 3: Deploy region-a ==="
+deploy_region cluster-region-a
 
-kubectl --context kind-cluster-auth apply -f "${ROOT_DIR}/k8s/cluster-auth/rbac.yaml"
+if [[ "$MODE" == "multi" ]]; then
+  echo "=== Step 4: Deploy region-b ==="
+  deploy_region cluster-region-b
 
-envsubst < "${ROOT_DIR}/k8s/cluster-auth/configmap.yaml.tpl" | kubectl --context kind-cluster-auth apply -f -
+  echo "=== Step 5: Set up cross-region replication ==="
+  "${SCRIPT_DIR}/setup-replication.sh"
+fi
 
-kubectl --context kind-cluster-auth apply -f "${ROOT_DIR}/k8s/cluster-auth/deployment.yaml"
-kubectl --context kind-cluster-auth apply -f "${ROOT_DIR}/k8s/cluster-auth/service.yaml"
+echo "=== Step 6: Deploy cluster-apps-minio ==="
+kubectl --context kind-cluster-apps-minio apply -f "${ROOT_DIR}/k8s/cluster-apps-minio/minio/minio.yaml"
+kubectl --context kind-cluster-apps-minio apply -f "${ROOT_DIR}/k8s/cluster-apps-minio/apps/test-client.yaml"
+kubectl --context kind-cluster-apps-minio -n minio rollout status deployment/minio --timeout=120s
+kubectl --context kind-cluster-apps-minio -n app-a rollout status deployment/test-client --timeout=60s
+kubectl --context kind-cluster-apps-minio -n app-b rollout status deployment/test-client --timeout=60s
 
-echo "Waiting for kube-federated-auth to be ready..."
-kubectl --context kind-cluster-auth -n db-ops rollout status deployment/kube-federated-auth --timeout=120s
-
-echo "=== Step 4: Deploy mariadb-operator ==="
-
-helm repo add mariadb-operator https://helm.mariadb.com/mariadb-operator 2>/dev/null || true
-helm repo update mariadb-operator
-
-helm upgrade --install mariadb-operator-crds mariadb-operator/mariadb-operator-crds \
-  --kube-context kind-cluster-dbs \
-  --wait
-
-helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
-  --kube-context kind-cluster-dbs \
-  --namespace db-ops \
-  --wait
-
-echo "=== Step 5: Deploy MariaDB instances ==="
-
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mariadb/mariadb-1.yaml"
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mariadb/mariadb-2.yaml"
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mariadb/mariadb-3.yaml"
-
-echo "Waiting for MariaDB instances to be ready..."
-kubectl --context kind-cluster-dbs -n mariadb-1 wait --for=condition=Ready mariadb/mariadb --timeout=180s
-kubectl --context kind-cluster-dbs -n mariadb-2 wait --for=condition=Ready mariadb/mariadb --timeout=180s
-kubectl --context kind-cluster-dbs -n mariadb-3 wait --for=condition=Ready mariadb/mariadb --timeout=180s
-
-echo "=== Step 5b: Deploy MongoDB instances ==="
-
-echo "Creating MongoDB credentials secrets..."
-for idx in 1 2 3; do
-  if ! kubectl --context kind-cluster-dbs -n "mongo-${idx}" get secret mongodb-credentials &>/dev/null; then
-    kubectl --context kind-cluster-dbs -n "mongo-${idx}" create secret generic mongodb-credentials \
-      --from-literal="MONGO_ROOT_USER=mongo${idx}-admin" \
-      --from-literal="MONGO_ROOT_PASS=$(openssl rand -base64 16 | tr -d '=+/')"
-  fi
-done
-
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mongodb/mongo-1.yaml"
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mongodb/mongo-2.yaml"
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/mongodb/mongo-3.yaml"
-
-echo "Waiting for MongoDB instances to be ready..."
-kubectl --context kind-cluster-dbs -n mongo-1 wait --for=condition=Ready pod -l app=mongodb --timeout=180s
-kubectl --context kind-cluster-dbs -n mongo-2 wait --for=condition=Ready pod -l app=mongodb --timeout=180s
-kubectl --context kind-cluster-dbs -n mongo-3 wait --for=condition=Ready pod -l app=mongodb --timeout=180s
-
-echo "=== Step 6: Build and load aqsh images ==="
-
-skaffold build --filename="${ROOT_DIR}/skaffold.yaml" --tag=latest --quiet
-kind load docker-image aqsh-mariadb:latest --name cluster-dbs
-kind load docker-image aqsh-mongodb:latest --name cluster-dbs
-
-echo "=== Step 7: Deploy cluster-dbs (aqsh + kube-auth-proxy + Redis) ==="
-
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/redis.yaml"
-
-envsubst < "${ROOT_DIR}/k8s/cluster-dbs/aqsh-mariadb-deployment.yaml.tpl" | kubectl --context kind-cluster-dbs apply -f -
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/aqsh-mariadb-service.yaml"
-
-envsubst < "${ROOT_DIR}/k8s/cluster-dbs/aqsh-mongodb-deployment.yaml.tpl" | kubectl --context kind-cluster-dbs apply -f -
-kubectl --context kind-cluster-dbs apply -f "${ROOT_DIR}/k8s/cluster-dbs/aqsh-mongodb-service.yaml"
-
-# Force pods to pick up newly loaded images (imagePullPolicy: Never)
-kubectl --context kind-cluster-dbs -n db-ops rollout restart deployment/aqsh-mariadb
-kubectl --context kind-cluster-dbs -n db-ops rollout restart deployment/aqsh-mongodb
-
-echo "Waiting for Redis to be ready..."
-kubectl --context kind-cluster-dbs -n db-ops rollout status deployment/redis --timeout=60s
-
-echo "Waiting for aqsh-mariadb to be ready..."
-kubectl --context kind-cluster-dbs -n db-ops rollout status deployment/aqsh-mariadb --timeout=120s
-
-echo "Waiting for aqsh-mongodb to be ready..."
-kubectl --context kind-cluster-dbs -n db-ops rollout status deployment/aqsh-mongodb --timeout=120s
-
-echo "=== Step 8: Deploy cluster-apps (test-client) ==="
-
-kubectl --context kind-cluster-apps apply -f "${ROOT_DIR}/k8s/cluster-apps/test-client.yaml"
-
-echo "Waiting for test-client to be ready..."
-kubectl --context kind-cluster-apps -n app-a rollout status deployment/test-client --timeout=60s
-kubectl --context kind-cluster-apps -n app-b rollout status deployment/test-client --timeout=60s
-
+echo ""
 echo "=== Deployment complete ==="
+echo "  Region-A nginx:  http://${REGION_A_IP}:30080"
+echo "  MinIO API:       http://${APPS_MINIO_IP}:30090"
+echo "  MinIO Console:   http://${APPS_MINIO_IP}:30091"
+[[ "$MODE" == "multi" ]] && echo "  Region-B nginx:  http://${REGION_B_IP}:30080"

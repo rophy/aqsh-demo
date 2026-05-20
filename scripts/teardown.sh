@@ -7,7 +7,7 @@ ENV_FILE="${ROOT_DIR}/.env"
 
 echo "=== Deleting Kind clusters ==="
 
-for cluster in cluster-auth cluster-dbs cluster-apps; do
+for cluster in cluster-region-a cluster-region-b cluster-apps-minio; do
   if kind get clusters 2>/dev/null | grep -qx "$cluster"; then
     echo "Deleting $cluster..."
     kind delete cluster --name "$cluster"

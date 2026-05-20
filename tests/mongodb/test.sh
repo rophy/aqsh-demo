@@ -7,7 +7,7 @@
 #   - verify MongoDB StatefulSet restarted
 #
 # Expects the following to be defined by the caller (scripts/test.sh):
-#   MONGODB_AQSH_URL, TOKEN, CLUSTER_DBS_IP, pass(), fail(), run_cmd()
+#   MONGODB_AQSH_URL, TOKEN, REGION_A_IP, pass(), fail(), run_cmd()
 # =============================================================================
 
 echo ""
@@ -72,7 +72,7 @@ fi
 echo ""
 echo "=== Test 11: MongoDB restart task (mongo-1) ==="
 
-BEFORE_GENERATION=$(kubectl --context kind-cluster-dbs -n mongo-1 get statefulset mongodb -o jsonpath='{.status.observedGeneration}')
+BEFORE_GENERATION=$(kubectl --context kind-cluster-region-a -n mongo-1 get statefulset mongodb -o jsonpath='{.status.observedGeneration}')
 echo "  > observedGeneration=$BEFORE_GENERATION"
 
 RESPONSE=$(curl -s -w '\n%{http_code}' \
@@ -124,14 +124,14 @@ fi
 echo ""
 echo "=== Test 12: Verify MongoDB StatefulSet restarted ==="
 
-if ! kubectl --context kind-cluster-dbs -n mongo-1 wait pod -l app=mongodb \
+if ! kubectl --context kind-cluster-region-a -n mongo-1 wait pod -l app=mongodb \
   --for=condition=Ready --timeout=120s >/dev/null 2>&1; then
   fail "MongoDB pods not ready within 120s"
 fi
 
-AFTER_GENERATION=$(kubectl --context kind-cluster-dbs -n mongo-1 get statefulset mongodb -o jsonpath='{.status.observedGeneration}')
-READY=$(kubectl --context kind-cluster-dbs -n mongo-1 get statefulset mongodb -o jsonpath='{.status.readyReplicas}')
-REPLICAS=$(kubectl --context kind-cluster-dbs -n mongo-1 get statefulset mongodb -o jsonpath='{.status.replicas}')
+AFTER_GENERATION=$(kubectl --context kind-cluster-region-a -n mongo-1 get statefulset mongodb -o jsonpath='{.status.observedGeneration}')
+READY=$(kubectl --context kind-cluster-region-a -n mongo-1 get statefulset mongodb -o jsonpath='{.status.readyReplicas}')
+REPLICAS=$(kubectl --context kind-cluster-region-a -n mongo-1 get statefulset mongodb -o jsonpath='{.status.replicas}')
 echo "  > observedGeneration=$AFTER_GENERATION (was $BEFORE_GENERATION)"
 echo "  > replicas=$REPLICAS ready=$READY"
 

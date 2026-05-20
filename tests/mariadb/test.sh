@@ -6,14 +6,14 @@
 #   - verify StatefulSet restarted
 #
 # Expects the following to be defined by the caller (scripts/test.sh):
-#   MARIADB_AQSH_URL, TOKEN, CLUSTER_DBS_IP, pass(), fail(), run_cmd()
+#   MARIADB_AQSH_URL, TOKEN, REGION_A_IP, pass(), fail(), run_cmd()
 # =============================================================================
 
 echo ""
 echo "=== Test 7: MariaDB restart task (mariadb-1) ==="
 
-echo "  \$ kubectl --context kind-cluster-dbs -n mariadb-1 get statefulset mariadb (before restart)"
-BEFORE_GENERATION=$(kubectl --context kind-cluster-dbs -n mariadb-1 get statefulset mariadb -o jsonpath='{.status.observedGeneration}')
+echo "  \$ kubectl --context kind-cluster-region-a -n mariadb-1 get statefulset mariadb (before restart)"
+BEFORE_GENERATION=$(kubectl --context kind-cluster-region-a -n mariadb-1 get statefulset mariadb -o jsonpath='{.status.observedGeneration}')
 echo "  > observedGeneration=$BEFORE_GENERATION"
 
 RESPONSE=$(curl -s -w '\n%{http_code}' \
@@ -70,14 +70,14 @@ fi
 echo ""
 echo "=== Test 9: Verify MariaDB StatefulSet restarted ==="
 
-if ! kubectl --context kind-cluster-dbs -n mariadb-1 wait pod -l app.kubernetes.io/name=mariadb \
+if ! kubectl --context kind-cluster-region-a -n mariadb-1 wait pod -l app.kubernetes.io/name=mariadb \
   --for=condition=Ready --timeout=120s >/dev/null 2>&1; then
   fail "MariaDB pods not ready within 120s"
 fi
 
-AFTER_GENERATION=$(kubectl --context kind-cluster-dbs -n mariadb-1 get statefulset mariadb -o jsonpath='{.status.observedGeneration}')
-READY=$(kubectl --context kind-cluster-dbs -n mariadb-1 get statefulset mariadb -o jsonpath='{.status.readyReplicas}')
-REPLICAS=$(kubectl --context kind-cluster-dbs -n mariadb-1 get statefulset mariadb -o jsonpath='{.status.replicas}')
+AFTER_GENERATION=$(kubectl --context kind-cluster-region-a -n mariadb-1 get statefulset mariadb -o jsonpath='{.status.observedGeneration}')
+READY=$(kubectl --context kind-cluster-region-a -n mariadb-1 get statefulset mariadb -o jsonpath='{.status.readyReplicas}')
+REPLICAS=$(kubectl --context kind-cluster-region-a -n mariadb-1 get statefulset mariadb -o jsonpath='{.status.replicas}')
 echo "  > observedGeneration=$AFTER_GENERATION (was $BEFORE_GENERATION)"
 echo "  > replicas=$REPLICAS ready=$READY"
 

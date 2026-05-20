@@ -34,7 +34,7 @@ deploy_region() {
 
   echo "--- kube-federated-auth ---"
   kubectl --context "$context" apply -f "${dir}/auth/rbac.yaml"
-  envsubst < "${dir}/auth/configmap.yaml.tpl" | kubectl --context "$context" apply -f -
+  envsubst < "${dir}/auth/configmap-${MODE}.yaml.tpl" | kubectl --context "$context" apply -f -
   kubectl --context "$context" apply -f "${dir}/auth/deployment.yaml"
   kubectl --context "$context" apply -f "${dir}/auth/service.yaml"
   kubectl --context "$context" -n db-ops rollout status deployment/kube-federated-auth --timeout=120s
@@ -64,13 +64,19 @@ deploy_region() {
   kubectl --context "$context" -n mongo-3 wait --for=condition=Ready pod -l app=mongodb --timeout=180s
 
   echo "--- Initialise MongoDB replica sets ---"
+  local CLUSTER_IP
+  [[ "$cluster" == "cluster-region-a" ]] && CLUSTER_IP="$REGION_A_IP"
+  [[ "$cluster" == "cluster-region-b" ]] && CLUSTER_IP="$REGION_B_IP"
+  local -a MONGO_PORTS=(30092 30094 30096)
+  local ns_idx=0
   for ns in mongo-1 mongo-2 mongo-3; do
     RS_NAME="rs-${ns}"
-    POD="${cluster}-control-plane"
+    local STREAM_PORT="${MONGO_PORTS[$ns_idx]}"
     kubectl --context "$context" -n "$ns" exec mongodb-0 -- \
       mongosh --quiet --norc --eval \
-      "try { rs.initiate({_id:'${RS_NAME}',members:[{_id:0,host:'mongodb-0.mongodb.${ns}.svc.cluster.local:27017'}]}) } catch(e) { if(e.codeName!='AlreadyInitialized') throw e }" \
+      "try { rs.initiate({_id:'${RS_NAME}',members:[{_id:0,host:'${CLUSTER_IP}:${STREAM_PORT}'}]}) } catch(e) { if(e.codeName!='AlreadyInitialized') throw e }" \
       2>/dev/null || true
+    ns_idx=$((ns_idx + 1))
   done
 
   echo "--- Build & load aqsh images ---"
@@ -80,6 +86,14 @@ deploy_region() {
 
   echo "--- Deploy Redis + aqsh ---"
   kubectl --context "$context" apply -f "${dir}/dbs/redis.yaml"
+  # Export defaults so envsubst fills plain ${VAR} tokens in secrets.yaml.tpl
+  export MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://${APPS_MINIO_IP}:30090}"
+  export MINIO_ACCESS_KEY="${MINIO_ACCESS_KEY:-minioadmin}"
+  export MINIO_SECRET_KEY="${MINIO_SECRET_KEY:-minioadmin}"
+  export MINIO_BUCKET_MARIADB="${MINIO_BUCKET_MARIADB:-mariadb-backups}"
+  export MINIO_BUCKET_MONGODB="${MINIO_BUCKET_MONGODB:-mongodb-backups}"
+  export MARIADB_REPLICATION_USER="${MARIADB_REPLICATION_USER:-repl}"
+  export MARIADB_REPLICATION_PASSWORD="${MARIADB_REPLICATION_PASSWORD:-replpass}"
   envsubst < "${dir}/dbs/secrets.yaml.tpl" | kubectl --context "$context" apply -f -
   envsubst < "${dir}/dbs/aqsh-mariadb-deployment.yaml.tpl" | kubectl --context "$context" apply -f -
   kubectl --context "$context" apply -f "${dir}/dbs/aqsh-mariadb-service.yaml"
@@ -112,6 +126,10 @@ if [[ "$MODE" == "multi" ]]; then
 fi
 
 kubectl --context kind-cluster-apps-minio apply -f "${ROOT_DIR}/k8s/cluster-apps-minio/namespace.yaml"
+kubectl --context kind-cluster-apps-minio apply -f "${ROOT_DIR}/k8s/cluster-apps-minio/apps/rbac.yaml"
+# Wait for the SA to be created so setup-credentials.sh can generate a token
+kubectl --context kind-cluster-apps-minio -n db-ops wait --for=jsonpath='{.metadata.name}'=kube-federated-auth-reader \
+  serviceaccount/kube-federated-auth-reader --timeout=30s
 
 echo "=== Step 2: Bootstrap cross-cluster credentials ==="
 "${SCRIPT_DIR}/setup-credentials.sh"

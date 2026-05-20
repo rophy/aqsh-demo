@@ -6,7 +6,7 @@
 # Corresponds to: docs/mongodb/sanity-check.md
 #
 # Prerequisites:
-#   - kubectl configured with kind-cluster-apps context
+#   - kubectl configured with kind-cluster-apps-minio context
 #   - jq installed
 #   - .env sourced (or CLUSTER_DBS_IP set manually)
 #
@@ -21,8 +21,8 @@ POLL_INTERVAL=3
 POLL_MAX=30
 
 # ── 1. Obtain a short-lived token ────────────────────────────────────────────
-echo ">>> Obtaining token from kind-cluster-apps / app-a / test-client ..."
-TOKEN=$(kubectl --context kind-cluster-apps -n app-a \
+echo ">>> Obtaining token from kind-cluster-apps-minio / app-a / test-client ..."
+TOKEN=$(kubectl --context kind-cluster-apps-minio -n app-a \
   create token test-client --duration=10m)
 
 # ── 2. Submit task (minimal — all defaults) ──────────────────────────────────

@@ -50,8 +50,8 @@ fi
 echo ""
 echo "=== Test 3: Authenticated task submission (common/hello via aqsh-mariadb) ==="
 
-echo "  \$ kubectl --context kind-cluster-apps -n app-a create token test-client --duration=10m"
-TOKEN=$(kubectl --context kind-cluster-apps -n app-a create token test-client --duration=10m)
+echo "  \$ kubectl --context kind-cluster-apps-minio -n app-a create token test-client --duration=10m"
+TOKEN=$(kubectl --context kind-cluster-apps-minio -n app-a create token test-client --duration=10m)
 echo "  > ${TOKEN:0:32}...${TOKEN: -16} (${#TOKEN} chars)"
 
 RESPONSE=$(curl -s -w '\n%{http_code}' \
@@ -149,17 +149,17 @@ echo ""
 echo "=== Test 6: In-pod test from cluster-apps (app-a) ==="
 
 TEST_POD=""
-if ! kubectl --context kind-cluster-apps -n app-a wait --for=condition=Ready pod -l app=test-client --timeout=120s >/dev/null 2>&1; then
+if ! kubectl --context kind-cluster-apps-minio -n app-a wait --for=condition=Ready pod -l app=test-client --timeout=120s >/dev/null 2>&1; then
   fail "test-client pod not ready within 120s; skipping in-pod tests"
 else
-  TEST_POD=$(kubectl --context kind-cluster-apps -n app-a get pod -l app=test-client -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  TEST_POD=$(kubectl --context kind-cluster-apps-minio -n app-a get pod -l app=test-client -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
   if [ -z "$TEST_POD" ]; then
     fail "could not find test-client pod; skipping in-pod tests"
   fi
 fi
 
 if [ -n "$TEST_POD" ]; then
-  IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps -n app-a exec "$TEST_POD" -- \
+  IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps-minio -n app-a exec "$TEST_POD" -- \
     sh -c 'curl -s -w "\n%{http_code}" \
       -X POST "http://'"${CLUSTER_DBS_IP}"':30081/tasks/common%2Fhello" \
       -H "Authorization: Bearer $(cat /var/run/secrets/tokens/token)" \
@@ -177,7 +177,7 @@ if [ -n "$TEST_POD" ]; then
     fail "in-pod request to aqsh-mariadb returned $IN_POD_CODE (expected 202)"
   fi
 
-  IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps -n app-a exec "$TEST_POD" -- \
+  IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps-minio -n app-a exec "$TEST_POD" -- \
     sh -c 'curl -s -w "\n%{http_code}" \
       -X POST "http://'"${CLUSTER_DBS_IP}"':30082/tasks/common%2Fhello" \
       -H "Authorization: Bearer $(cat /var/run/secrets/tokens/token)" \

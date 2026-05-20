@@ -48,7 +48,7 @@ spec:
           command:
             - sh
             - -c
-            - echo 'sandbox-mongodb-rs-keyfile' > /keyfile/keyfile && chmod 400 /keyfile/keyfile
+            - echo 'sandboxMongoDBKeyfile2024' > /keyfile/keyfile && chmod 400 /keyfile/keyfile
           securityContext:
             runAsUser: 999
             runAsNonRoot: true

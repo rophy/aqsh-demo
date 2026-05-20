@@ -161,14 +161,14 @@ fi
 if [ -n "$TEST_POD" ]; then
   IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps-minio -n app-a exec "$TEST_POD" -- \
     sh -c 'curl -s -w "\n%{http_code}" \
-      -X POST "http://'"${CLUSTER_DBS_IP}"':30081/tasks/common%2Fhello" \
+      -X POST "http://'"${CLUSTER_DBS_IP}"':30082/tasks/common%2Fhello" \
       -H "Authorization: Bearer $(cat /var/run/secrets/tokens/token)" \
       -H "Content-Type: application/json" \
       -d "{\"name\": \"from-pod\"}"' 2>/dev/null || echo -e "\n000")
 
   IN_POD_CODE=$(echo "$IN_POD_RESPONSE" | tail -1)
   IN_POD_BODY=$(echo "$IN_POD_RESPONSE" | sed '$d')
-  echo "  > HTTP $IN_POD_CODE (aqsh-mariadb :30081)"
+  echo "  > HTTP $IN_POD_CODE (aqsh-mariadb :30082)"
   echo "  > $IN_POD_BODY"
 
   if [ "$IN_POD_CODE" = "202" ]; then
@@ -179,14 +179,14 @@ if [ -n "$TEST_POD" ]; then
 
   IN_POD_RESPONSE=$(kubectl --context kind-cluster-apps-minio -n app-a exec "$TEST_POD" -- \
     sh -c 'curl -s -w "\n%{http_code}" \
-      -X POST "http://'"${CLUSTER_DBS_IP}"':30082/tasks/common%2Fhello" \
+      -X POST "http://'"${CLUSTER_DBS_IP}"':30083/tasks/common%2Fhello" \
       -H "Authorization: Bearer $(cat /var/run/secrets/tokens/token)" \
       -H "Content-Type: application/json" \
       -d "{\"name\": \"from-pod\"}"' 2>/dev/null || echo -e "\n000")
 
   IN_POD_CODE=$(echo "$IN_POD_RESPONSE" | tail -1)
   IN_POD_BODY=$(echo "$IN_POD_RESPONSE" | sed '$d')
-  echo "  > HTTP $IN_POD_CODE (aqsh-mongodb :30082)"
+  echo "  > HTTP $IN_POD_CODE (aqsh-mongodb :30083)"
   echo "  > $IN_POD_BODY"
 
   if [ "$IN_POD_CODE" = "202" ]; then

@@ -22,6 +22,16 @@ data:
       uwsgi_temp_path /tmp/uwsgi_temp;
       scgi_temp_path /tmp/scgi_temp;
 
+      # Preserve %2F encoding: use $request_uri (raw) instead of $uri (decoded)
+      map $request_uri $mariadb_uri {
+        ~^/mariadb(/.*)$  $1;
+        default           "";
+      }
+      map $request_uri $mongodb_uri {
+        ~^/mongodb(/.*)$  $1;
+        default           "";
+      }
+
       upstream aqsh_mariadb {
         server aqsh-mariadb.db-ops.svc.cluster.local:4180;
       }
@@ -33,16 +43,14 @@ data:
         listen 80;
 
         location /mariadb/ {
-          rewrite ^/mariadb(/.*)$ $1 break;
-          proxy_pass http://aqsh_mariadb;
+          proxy_pass http://aqsh_mariadb$mariadb_uri;
           proxy_set_header Host $host;
           proxy_set_header Authorization $http_authorization;
           proxy_pass_header Authorization;
         }
 
         location /mongodb/ {
-          rewrite ^/mongodb(/.*)$ $1 break;
-          proxy_pass http://aqsh_mongodb;
+          proxy_pass http://aqsh_mongodb$mongodb_uri;
           proxy_set_header Host $host;
           proxy_set_header Authorization $http_authorization;
           proxy_pass_header Authorization;

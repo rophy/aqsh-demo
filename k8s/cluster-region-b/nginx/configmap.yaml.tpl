@@ -29,20 +29,28 @@ data:
         server aqsh-mongodb.db-ops.svc.cluster.local:4180;
       }
 
+      # Preserve %2F encoding: use $request_uri (raw) instead of $uri (decoded)
+      map $request_uri $mariadb_uri {
+        ~^/mariadb(/.*)$  $1;
+        default           "";
+      }
+      map $request_uri $mongodb_uri {
+        ~^/mongodb(/.*)$  $1;
+        default           "";
+      }
+
       server {
         listen 80;
 
         location /mariadb/ {
-          rewrite ^/mariadb(/.*)$ $1 break;
-          proxy_pass http://aqsh_mariadb;
+          proxy_pass http://aqsh_mariadb$mariadb_uri;
           proxy_set_header Host $host;
           proxy_set_header Authorization $http_authorization;
           proxy_pass_header Authorization;
         }
 
         location /mongodb/ {
-          rewrite ^/mongodb(/.*)$ $1 break;
-          proxy_pass http://aqsh_mongodb;
+          proxy_pass http://aqsh_mongodb$mongodb_uri;
           proxy_set_header Host $host;
           proxy_set_header Authorization $http_authorization;
           proxy_pass_header Authorization;
